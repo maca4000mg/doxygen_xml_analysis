@@ -72,12 +72,13 @@ get_accessable_members() {
     fi
 
     # 親クラスのメンバを再帰的に出力
-
     parent=$(parent_class $class $xmldir)
     if [ -z $parent ]; then
         return
     fi
     get_accessable_members $parent $xmldir
+
+    # public メンバ関数
     pub_funcs=$(echo 'cat /doxygen/compounddef/sectiondef[@kind="public-func"]/memberdef/name' | xmllint --shell $class_file | grep "\<name\>" | perl -pi -e 's/\<name\>(.*)\<\/name\>/$1/g')
     if [ -n "$pub_funcs" ]; then
         for pub_func in $pub_funcs; do
@@ -85,6 +86,7 @@ get_accessable_members() {
         done
     fi
 
+    # public メンバ変数
     pub_vars=$(echo 'cat /doxygen/compounddef/sectiondef[@kind="public-attrib"]/memberdef/name' | xmllint --shell $class_file | grep "\<name\>" | perl -pi -e 's/\<name\>(.*)\<\/name\>/$1/g')
     if [ -n "$pub_vars" ]; then
         for pub_var in $pub_vars; do
@@ -92,6 +94,7 @@ get_accessable_members() {
         done
     fi
 
+    # protected メンバ関数
     pro_funcs=$(echo 'cat /doxygen/compounddef/sectiondef[@kind="protected-func"]/memberdef/name' | xmllint --shell $class_file | grep "\<name\>" | perl -pi -e 's/\<name\>(.*)\<\/name\>/$1/g')
     if [ -n "$pro_funcs" ]; then
         for pro_func in $pro_funcs; do
@@ -99,6 +102,7 @@ get_accessable_members() {
         done
     fi
 
+    # protected メンバ変数
     pro_vars=$(echo 'cat /doxygen/compounddef/sectiondef[@kind="protected-attrib"]/memberdef/name' | xmllint --shell $class_file | grep "\<name\>" | perl -pi -e 's/\<name\>(.*)\<\/name\>/$1/g')
     if [ -n "$pro_vars" ]; then
         for pro_var in $pro_vars; do
@@ -110,24 +114,26 @@ get_accessable_members() {
 select_function() {
     local xmldir=$1
     cd $xmldir
-    local fzf_res=$(find $xmldir -name "class*.xml" -printf "%f\n" | \
+    local fzf_res=$( \
+        find $xmldir -name "class*.xml" -printf "%f\n" | \
         perl -pi -e 's/^class(.*)\.xml/\1/g' | \
-        fzf --ansi --no-sort --expect=ctrl-a,ctrl-d,ctrl-u)
+        fzf --ansi --no-sort --cycle \
+            --expect=ctrl-a,ctrl-d,ctrl-u \
+            --header="[ctrl-a]accessable members [ctrl-u]parent classes [ctrl-d]child classes")
 
     local key="$(head -1 <<< "$fzf_res")"
     local class="$(head -2 <<< "$fzf_res" | tail -1)"
 
     case $key in
         "ctrl-a")
-            #echo get member of $class
+            # TODO 自クラスは，privateメンバも表示する必要あり
             get_accessable_members $class $xmldir
             ;;
         "ctrl-d")
-            #echo get child class of $class
+            # TODO 再帰的に子クラスを表示
             get_child_classes $class $xmldir
             ;;
         "ctrl-u")
-            #echo get parent class of $class
             get_parent_classes $class $xmldir
             ;;
         *)
